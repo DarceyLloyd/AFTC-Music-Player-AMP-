@@ -13,6 +13,8 @@ import { destroyTray, ensureTray } from './utils/tray.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CONFIG_PATH = path.join(__dirname, 'config.json');
+const APP_TITLE = 'AFTC Music Player';
+const APP_WINDOW_TITLE = `${APP_TITLE} v${app.getVersion()}`;
 
 const DEFAULT_APP_CONFIG = {
   ui: {
@@ -171,7 +173,7 @@ function createWindow() {
     icon: path.join(__dirname, 'src', 'assets', 'icons', 'icon.ico'),
     minWidth: 980,
     minHeight: 620,
-    title: 'AFTC Music Player',
+    title: APP_WINDOW_TITLE,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -203,6 +205,15 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+  mainWindow.on('page-title-updated', (event) => {
+    // Keep native window title consistent with package version.
+    event.preventDefault();
+    mainWindow.setTitle(APP_WINDOW_TITLE);
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.setTitle(APP_WINDOW_TITLE);
+  });
   setApplicationMenu();
 }
 

@@ -32,7 +32,8 @@ function createMetadataDetails(track, metadata) {
     metadataLine('Sample Rate', metadata?.sampleRate || '-'),
     metadataLine('Rating', metadata?.rating ? `${metadata.rating}/5` : 'Unrated'),
     metadataLine('Year', metadata?.year || '-'),
-    metadataLine('Format', metadata?.format || track.ext.replace('.', '').toUpperCase())
+    metadataLine('Format', metadata?.format || track.ext.replace('.', '').toUpperCase()),
+    metadataLine('File path', track.path)
   );
 
   return details;
