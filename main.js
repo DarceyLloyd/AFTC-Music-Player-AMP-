@@ -35,6 +35,26 @@ const store = new Store({
 let mainWindow;
 let isQuitting = false;
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
+function restoreAndFocusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+
+  // Show is required when the app is hidden to tray.
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 function clampScrollDuration(value, fallback) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return fallback;
@@ -406,14 +426,23 @@ ipcMain.handle('set-track-rating', async (_event, payload) => {
   }
 });
 
-app.whenReady().then(() => {
-  createWindow();
-});
+if (hasSingleInstanceLock) {
+  app.on('second-instance', () => {
+    restoreAndFocusMainWindow();
+  });
+
+  app.whenReady().then(() => {
+    createWindow();
+  });
+}
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+    return;
   }
+
+  restoreAndFocusMainWindow();
 });
 
 app.on('before-quit', () => {
