@@ -1,0 +1,7 @@
+{
+  "ui": {
+    "playlistScrollDurationSeconds": 0.5,
+    "startupScrollDurationSeconds": 1,
+    "infoToggleDurationSeconds": 0.58
+  }
+}

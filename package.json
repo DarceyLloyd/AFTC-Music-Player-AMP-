@@ -1,0 +1,55 @@
+{
+  "name": "aftc-music-player",
+  "version": "1.0.0",
+  "description": "Windows-first Electron desktop music player",
+  "license": "MIT",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder --win",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "verify:trash-helper": "node scripts/verify-trash-helper.mjs",
+    "build:verify": "npm run build && npm run verify:trash-helper"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "flac-metadata": "^0.1.1",
+    "gsap": "^3.14.2",
+    "music-metadata": "^11.9.0",
+    "node-id3": "^0.2.9",
+    "trash": "^10.0.0"
+  },
+  "devDependencies": {
+    "electron": "^41.0.3",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.aftc.musicplayer",
+    "productName": "AFTC Music Player",
+    "asarUnpack": [
+      "**/node_modules/trash/lib/windows-trash.exe",
+      "**/node_modules/recycle-bin/*.exe"
+    ],
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "utils/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/icons/icon.ico"
+    },
+    "mac": {
+      "icon": "src/assets/icons/Icon-256.png"
+    },
+    "linux": {
+      "icon": "src/assets/icons/Icon-256.png"
+    }
+  }
+}
