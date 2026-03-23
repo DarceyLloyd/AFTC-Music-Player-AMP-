@@ -35,6 +35,7 @@ Desktop.ini
 !.vscode/settings.json
 
 # Miscellaneous
+.old
 *.bak
 *.tmp
 *.rar
