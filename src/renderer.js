@@ -201,6 +201,11 @@ function wireDragAndDrop() {
   const activeClass = 'active';
 
   window.addEventListener('dragover', (event) => {
+    if (!isExternalFileDrop(event.dataTransfer)) {
+      dom.dropOverlay.classList.remove(activeClass);
+      return;
+    }
+
     event.preventDefault();
     dom.dropOverlay.classList.add(activeClass);
   });
@@ -212,6 +217,11 @@ function wireDragAndDrop() {
   });
 
   window.addEventListener('drop', async (event) => {
+    if (!isExternalFileDrop(event.dataTransfer)) {
+      dom.dropOverlay.classList.remove(activeClass);
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     dom.dropOverlay.classList.remove(activeClass);
@@ -226,6 +236,18 @@ function wireDragAndDrop() {
     const result = await window.aftc.importDroppedPaths(filePaths);
     await importResultIntoPlaylist(result, 'Imported from drag-and-drop.');
   });
+}
+
+function isExternalFileDrop(dataTransfer) {
+  if (!dataTransfer) return false;
+
+  const types = Array.from(dataTransfer.types || []);
+  if (types.includes('Files') || types.includes('text/uri-list')) {
+    return true;
+  }
+
+  const hasFileItem = Array.from(dataTransfer.items || []).some((item) => item.kind === 'file');
+  return hasFileItem;
 }
 
 function extractDroppedPaths(dataTransfer) {
