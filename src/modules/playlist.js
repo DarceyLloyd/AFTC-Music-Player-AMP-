@@ -1,3 +1,10 @@
+import {
+  hasTrackPath,
+  normalizeSelectionIndex,
+  normalizeTracks,
+  removeTrackByPath
+} from '../services/playlist/stateUtils.js';
+
 export class PlaylistStore {
   constructor() {
     this.tracks = [];
@@ -6,20 +13,18 @@ export class PlaylistStore {
   }
 
   setTracks(tracks) {
-    this.tracks = Array.isArray(tracks) ? tracks : [];
+    this.tracks = normalizeTracks(tracks);
     if (this.tracks.length === 0) {
       this.selectedIndex = -1;
       this.expandedPath = null;
       return;
     }
 
-    if (this.expandedPath && !this.tracks.some((track) => track.path === this.expandedPath)) {
+    if (this.expandedPath && !hasTrackPath(this.tracks, this.expandedPath)) {
       this.expandedPath = null;
     }
 
-    if (this.selectedIndex < 0 || this.selectedIndex >= this.tracks.length) {
-      this.selectedIndex = 0;
-    }
+    this.selectedIndex = normalizeSelectionIndex(this.selectedIndex, this.tracks.length);
   }
 
   clear() {
@@ -39,7 +44,7 @@ export class PlaylistStore {
       this.expandedPath = null;
     }
 
-    const next = this.tracks.filter((t) => t.path !== trackPath);
+    const next = removeTrackByPath(this.tracks, trackPath);
     this.setTracks(next);
   }
 

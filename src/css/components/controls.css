@@ -1,0 +1,87 @@
+.rowControls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space2);
+}
+
+.auxControls {
+  display: inline-flex;
+  gap: var(--space1);
+  align-items: center;
+}
+
+.transport {
+  justify-self: center;
+  display: inline-flex;
+  gap: var(--space1);
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #3a3a3f;
+  color: var(--textPrimary);
+  padding: 8px 12px;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background var(--transitionFast), border-color var(--transitionFast), transform var(--transitionFast);
+}
+
+.btn:hover {
+  background: #45454a;
+}
+
+#clearBtn,
+#openFolderBtn {
+  background: #505055;
+  border-color: #6c6c72;
+  color: #f3f3f4;
+}
+
+#prevBtn,
+#playPauseBtn,
+#stopBtn,
+#nextBtn {
+  background: #505055;
+  border-color: #6c6c72;
+  color: #f3f3f4;
+}
+
+#clearBtn:hover,
+#openFolderBtn:hover {
+  background: #5a5a60;
+  border-color: #7a7a82;
+}
+
+#prevBtn:hover,
+#playPauseBtn:hover,
+#stopBtn:hover,
+#nextBtn:hover {
+  background: #5a5a60;
+  border-color: #7a7a82;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btnPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btnAccent {
+  background: #3b3b40;
+  border-color: #4f728f;
+}
+
+.btnDanger {
+  background: #4a2e2b;
+  border-color: #7f4a43;
+  color: var(--danger);
+}
+
+

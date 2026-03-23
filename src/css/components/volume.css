@@ -1,0 +1,8 @@
+.volumeRow {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space2);
+}
+
+

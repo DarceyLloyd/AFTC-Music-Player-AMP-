@@ -1,0 +1,48 @@
+.appShell {
+  display: grid;
+  grid-template-rows: minmax(260px, 1fr) auto auto auto;
+  gap: var(--space2);
+  height: 100%;
+  min-height: 0;
+}
+
+.row {
+  background: linear-gradient(180deg, #343438 0%, var(--bgSurface) 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space2) var(--space3);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.25);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space2);
+  margin-bottom: 8px;
+}
+
+.sectionHeader h1 {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+
+.muted {
+  margin: 0;
+  color: var(--textMuted);
+  font-size: 0.8rem;
+}
+
+.rowTracks {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  background: #31373c;
+  box-shadow:
+    0 14px 26px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(88, 166, 255, 0.18);
+}
+
+

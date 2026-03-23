@@ -1,0 +1,17 @@
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(0, 122, 204, 0.2);
+  border: 2px dashed #3794ff;
+  border-radius: var(--radius);
+  z-index: 2;
+  color: #cde9ff;
+  font-weight: 600;
+}
+
+.dropOverlay.active {
+  display: grid;
+}
+

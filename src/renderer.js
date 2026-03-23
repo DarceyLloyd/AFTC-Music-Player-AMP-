@@ -1,6 +1,9 @@
-import { AudioPlayer } from './player.js';
-import { PlaylistStore } from './playlist.js';
-import { gsap } from '../node_modules/gsap/index.js';
+import { AudioPlayer } from './modules/player.js';
+import { PlaylistStore } from './modules/playlist.js';
+import { TrackListComponent } from './components/trackListComponent.js';
+import { ProgressComponent } from './components/progressComponent.js';
+import { syncVolumeIcon } from './components/volumeComponent.js';
+import { wireDragAndDrop as setupDragAndDrop } from './components/dragDropComponent.js';
 
 const dom = {
   appShell: document.getElementById('appShell'),
@@ -34,11 +37,34 @@ let scrollConfig = {
   infoToggleSeconds: 0.18
 };
 
+const progressComponent = new ProgressComponent({
+  seekBar: dom.seekBar,
+  startTime: dom.startTime,
+  currentTime: dom.currentTime,
+  durationTime: dom.durationTime
+});
+
 const player = new AudioPlayer({
   onStateChange: handlePlayerStateChange,
   onTimeUpdate: updateProgress,
   onTrackEnd: handleTrackEnd,
   onError: handlePlaybackError
+});
+
+const trackListComponent = new TrackListComponent({
+  trackListElement: dom.trackList,
+  playlistStore,
+  player,
+  metadataByPath,
+  getScrollConfig: () => scrollConfig,
+  onPlayTrack: async (index) => {
+    await player.play(index);
+    trackListComponent.render({ scrollTarget: 'current' });
+    updateNowPlaying();
+    updatePlayPauseButton();
+  },
+  onOpenRemoveDialog: openRemoveDialog,
+  onSetTrackRating: setTrackRating
 });
 
 bootstrap().catch((error) => {
@@ -71,7 +97,7 @@ async function bootstrap() {
     const savedVolume = await window.aftc.getSavedVolume();
     dom.volumeSlider.value = `${savedVolume}`;
     player.setVolume(savedVolume);
-    syncVolumeIcon(savedVolume);
+    syncVolumeIcon(dom.volumeIcon, savedVolume);
 
     const savedPlaylist = await window.aftc.getSavedPlaylist();
     if (savedPlaylist.length > 0) {
@@ -90,7 +116,7 @@ async function bootstrap() {
     // Re-run once visible to guarantee last selected track is brought into view.
     if (playlistStore.tracks.length > 0) {
       await waitForUiSettle();
-      renderTrackList({ scrollTarget: 'selected', smooth: true });
+      trackListComponent.render({ scrollTarget: 'selected', smooth: true });
     }
   }
 }
@@ -118,7 +144,7 @@ function wireControls() {
   dom.volumeSlider.addEventListener('input', async () => {
     const value = Number(dom.volumeSlider.value);
     player.setVolume(value);
-    syncVolumeIcon(value);
+    syncVolumeIcon(dom.volumeIcon, value);
     await window.aftc.saveVolume(value);
   });
 
@@ -198,145 +224,13 @@ function wireMenuBindings() {
 }
 
 function wireDragAndDrop() {
-  const activeClass = 'active';
-
-  window.addEventListener('dragover', (event) => {
-    if (!isExternalFileDrop(event.dataTransfer)) {
-      dom.dropOverlay.classList.remove(activeClass);
-      return;
-    }
-
-    event.preventDefault();
-    dom.dropOverlay.classList.add(activeClass);
-  });
-
-  window.addEventListener('dragleave', (event) => {
-    if (event.relatedTarget === null) {
-      dom.dropOverlay.classList.remove(activeClass);
+  setupDragAndDrop({
+    dropOverlayElement: dom.dropOverlay,
+    onImportDroppedPaths: async (filePaths) => {
+      const result = await window.aftc.importDroppedPaths(filePaths);
+      await importResultIntoPlaylist(result, 'Imported from drag-and-drop.');
     }
   });
-
-  window.addEventListener('drop', async (event) => {
-    if (!isExternalFileDrop(event.dataTransfer)) {
-      dom.dropOverlay.classList.remove(activeClass);
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    dom.dropOverlay.classList.remove(activeClass);
-
-    const filePaths = extractDroppedPaths(event.dataTransfer);
-
-    if (filePaths.length === 0) {
-      alert('Drop detected, but no file or folder path could be read from the drag payload.');
-      return;
-    }
-
-    const result = await window.aftc.importDroppedPaths(filePaths);
-    await importResultIntoPlaylist(result, 'Imported from drag-and-drop.');
-  });
-}
-
-function isExternalFileDrop(dataTransfer) {
-  if (!dataTransfer) return false;
-
-  const types = Array.from(dataTransfer.types || []);
-  if (types.includes('Files') || types.includes('text/uri-list')) {
-    return true;
-  }
-
-  const hasFileItem = Array.from(dataTransfer.items || []).some((item) => item.kind === 'file');
-  return hasFileItem;
-}
-
-function extractDroppedPaths(dataTransfer) {
-  if (!dataTransfer) return [];
-
-  const candidates = new Set();
-
-  for (const file of Array.from(dataTransfer.files || [])) {
-    const resolvedPath = resolveDroppedFilePath(file);
-    if (resolvedPath) {
-      candidates.add(resolvedPath);
-    }
-  }
-
-  for (const item of Array.from(dataTransfer.items || [])) {
-    const file = item.getAsFile?.();
-    const resolvedPath = resolveDroppedFilePath(file);
-    if (resolvedPath) {
-      candidates.add(resolvedPath);
-    }
-  }
-
-  const uriList = dataTransfer.getData('text/uri-list');
-  if (uriList) {
-    for (const line of uriList.split(/\r?\n/)) {
-      const value = line.trim();
-      if (!value || value.startsWith('#')) continue;
-      const resolved = uriToPath(value);
-      if (resolved) {
-        candidates.add(resolved);
-      }
-    }
-  }
-
-  const plainText = dataTransfer.getData('text/plain');
-  if (plainText) {
-    for (const line of plainText.split(/\r?\n/)) {
-      const value = line.trim().replace(/^"|"$/g, '');
-      if (!value) continue;
-
-      if (value.startsWith('file:///')) {
-        const resolved = uriToPath(value);
-        if (resolved) {
-          candidates.add(resolved);
-        }
-        continue;
-      }
-
-      if (looksLikeWindowsPath(value)) {
-        candidates.add(value.replace(/\//g, '\\'));
-      }
-    }
-  }
-
-  return Array.from(candidates);
-}
-
-function uriToPath(uri) {
-  if (!uri || !uri.startsWith('file:///')) return '';
-
-  try {
-    const withoutScheme = uri.replace('file:///', '');
-    const decoded = decodeURIComponent(withoutScheme);
-    const withWindowsDrive = decoded.replace(/^\/?([a-zA-Z]:)/, '$1');
-    return withWindowsDrive.replace(/\//g, '\\');
-  } catch {
-    return '';
-  }
-}
-
-function looksLikeWindowsPath(value) {
-  return /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('\\\\');
-}
-
-function resolveDroppedFilePath(file) {
-  if (!file) return '';
-
-  if (typeof window.aftc?.getPathForFile === 'function') {
-    const resolved = window.aftc.getPathForFile(file);
-    if (resolved && looksLikeWindowsPath(resolved)) {
-      return resolved;
-    }
-  }
-
-  if (typeof file.path === 'string' && file.path) {
-    return file.path;
-  }
-
-  return '';
 }
 
 async function openFolder() {
@@ -393,7 +287,7 @@ async function replacePlaylist(files, { sourceLabel, preferredTrackPath = null, 
   await window.aftc.savePlaylist(playlistStore.tracks);
 
   dom.importSummary.textContent = `${sourceLabel} ${normalized.length} tracks loaded.`;
-  renderTrackList({ scrollTarget: scrollToSelectionOnRender ? 'selected' : 'current' });
+  trackListComponent.render({ scrollTarget: scrollToSelectionOnRender ? 'selected' : 'current' });
   if (scrollToSelectionOnRender) {
     await waitForUiSettle();
   }
@@ -402,7 +296,7 @@ async function replacePlaylist(files, { sourceLabel, preferredTrackPath = null, 
 }
 
 function setTrackListLoading(isLoading, message = 'Loading...') {
-  dom.trackList.classList.toggle('is-loading', isLoading);
+  dom.trackList.classList.toggle('isLoading', isLoading);
   dom.trackList.setAttribute('aria-busy', String(isLoading));
 
   if (isLoading) {
@@ -411,7 +305,7 @@ function setTrackListLoading(isLoading, message = 'Loading...') {
     return;
   }
 
-  dom.trackList.removeAttribute('data-loading-message');
+  delete dom.trackList.dataset.loadingMessage;
 }
 
 async function waitForUiSettle() {
@@ -433,356 +327,6 @@ async function hydrateMetadata(filePaths) {
   for (const [filePath, metadata] of Object.entries(batch)) {
     metadataByPath.set(filePath, metadata);
   }
-}
-
-function renderTrackList({ scrollTarget = 'none', smooth = false } = {}) {
-  dom.trackList.innerHTML = '';
-  let currentElement = null;
-  let selectedElement = null;
-
-  playlistStore.tracks.forEach((track, index) => {
-    const container = document.createElement('article');
-    container.className = 'track-item';
-    const isCurrentTrack = index === player.currentIndex;
-    const isSelected = index === playlistStore.selectedIndex;
-    const isPlaying = isCurrentTrack && player.isPlaying;
-
-    if (isCurrentTrack) container.classList.add('selected');
-    if (isPlaying) container.classList.add('playing');
-
-    const metadata = metadataByPath.get(track.path);
-    const lineLabel = `${index + 1}. ${metadata?.artist ? `${metadata.artist} - ` : ''}${track.name}`;
-
-    const head = document.createElement('div');
-    head.className = 'track-head';
-    head.dataset.trackPath = track.path;
-    head.tabIndex = 0;
-    head.setAttribute('role', 'option');
-    head.setAttribute('aria-selected', String(isSelected));
-
-    const main = document.createElement('div');
-    main.className = 'track-main';
-    main.textContent = `${isPlaying ? '♪ ' : ''}${lineLabel}`;
-
-    const actions = document.createElement('div');
-    actions.className = 'track-actions';
-
-    const ratingControl = createRatingControl(track.path, metadata?.rating || 0);
-
-    const expandBtn = document.createElement('button');
-    expandBtn.type = 'button';
-    expandBtn.className = 'icon-btn expand-btn';
-    expandBtn.title = 'Expand metadata';
-    setExpandButtonState(expandBtn, playlistStore.isExpanded(track.path));
-
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'icon-btn delete-btn';
-    removeBtn.title = 'Remove or delete track';
-    removeBtn.textContent = 'DELETE';
-
-    expandBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-
-      const isExpanded = playlistStore.isExpanded(track.path);
-      const existingDetails = container.querySelector('.metadata');
-
-      if (isExpanded) {
-        playlistStore.toggleExpanded(track.path);
-        setExpandButtonState(expandBtn, false);
-        if (existingDetails) {
-          animateMetadataCollapse(existingDetails);
-        }
-        return;
-      }
-
-      collapseExpandedMetadataRows(track.path);
-      playlistStore.toggleExpanded(track.path);
-
-      // Guard against stale nodes when users toggle quickly during animation.
-      container.querySelectorAll('.metadata').forEach((staleDetails) => {
-        gsap.killTweensOf(staleDetails);
-        staleDetails.remove();
-      });
-
-      setExpandButtonState(expandBtn, true);
-      const details = createMetadataDetails(track, metadata);
-      container.append(details);
-      animateMetadataExpand(details);
-    });
-
-    expandBtn.addEventListener('dblclick', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    });
-
-    removeBtn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      openRemoveDialog(track.path);
-    });
-
-    removeBtn.addEventListener('dblclick', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    });
-
-    head.addEventListener('click', () => {
-      // Single click is intentionally inert; double click controls track targeting.
-    });
-
-    head.addEventListener('dblclick', async () => {
-      playlistStore.select(index);
-      await player.play(index);
-      renderTrackList({ scrollTarget: 'current' });
-      updateNowPlaying();
-      updatePlayPauseButton();
-    });
-
-    actions.append(ratingControl, expandBtn, removeBtn);
-    head.append(main, actions);
-    container.append(head);
-
-    if (playlistStore.isExpanded(track.path)) {
-      const details = createMetadataDetails(track, metadata);
-      container.append(details);
-    }
-
-    if (isCurrentTrack) {
-      currentElement = container;
-    }
-
-    if (isSelected) {
-      selectedElement = container;
-    }
-
-    dom.trackList.append(container);
-  });
-
-  if (scrollTarget === 'selected' && selectedElement) {
-    scrollTrackIntoView(selectedElement, { block: 'start', smooth });
-    return;
-  }
-
-  if (scrollTarget === 'current' && currentElement) {
-    scrollTrackIntoView(currentElement, { block: 'nearest', smooth });
-    return;
-  }
-
-  if (scrollTarget === 'auto') {
-    if (player.isPlaying && currentElement) {
-      scrollTrackIntoView(currentElement, { block: 'nearest', smooth: true });
-      return;
-    }
-
-    if (selectedElement) {
-      scrollTrackIntoView(selectedElement, { block: 'start', smooth: true });
-    }
-  }
-}
-
-function scrollTrackIntoView(targetElement, { block = 'nearest', smooth = false } = {}) {
-  if (!targetElement) return;
-
-  const container = dom.trackList;
-  if (!container) return;
-
-  const targetTop = targetElement.offsetTop;
-  const targetBottom = targetTop + targetElement.offsetHeight;
-  const viewTop = container.scrollTop;
-  const viewBottom = viewTop + container.clientHeight;
-
-  let fallbackTop = viewTop;
-  if (block === 'start') {
-    fallbackTop = Math.max(0, targetTop);
-  } else if (targetTop < viewTop) {
-    fallbackTop = Math.max(0, targetTop);
-  } else if (targetBottom > viewBottom) {
-    fallbackTop = Math.max(0, targetBottom - container.clientHeight);
-  }
-
-  if (smooth) {
-    if (Math.abs(fallbackTop - container.scrollTop) <= 1) {
-      return;
-    }
-
-    gsap.killTweensOf(container);
-    gsap.to(container, {
-      duration: 1,
-      ease: 'power2.out',
-      scrollTop: fallbackTop
-    });
-    return;
-  }
-
-  if (Math.abs(fallbackTop - container.scrollTop) <= 1) {
-    return;
-  }
-
-  const duration = smooth ? scrollConfig.startupSeconds : scrollConfig.playlistSeconds;
-  gsap.killTweensOf(container);
-  gsap.to(container, {
-    duration,
-    ease: 'power2.out',
-    scrollTop: fallbackTop
-  });
-}
-
-function createMetadataDetails(track, metadata) {
-  const details = document.createElement('div');
-  details.className = 'metadata';
-  details.append(
-    metadataLine('Artist', metadata?.artist || 'Unknown Artist'),
-    metadataLine('Album', metadata?.album || 'Unknown Album'),
-    metadataLine('Title', metadata?.title || track.name),
-    metadataLine('Duration', metadata?.duration || '0:00'),
-    metadataLine('Bitrate', metadata?.bitrate || '-'),
-    metadataLine('Sample Rate', metadata?.sampleRate || '-'),
-    metadataLine('Rating', metadata?.rating ? `${metadata.rating}/5` : 'Unrated'),
-    metadataLine('Year', metadata?.year || '-'),
-    metadataLine('Format', metadata?.format || track.ext.replace('.', '').toUpperCase())
-  );
-
-  return details;
-}
-
-function setExpandButtonState(button, isExpanded) {
-  button.textContent = isExpanded ? 'Info ▼' : 'Info ▶';
-  button.setAttribute('aria-expanded', String(isExpanded));
-}
-
-function collapseExpandedMetadataRows(exceptTrackPath) {
-  const trackItems = dom.trackList.querySelectorAll('.track-item');
-  trackItems.forEach((trackItem) => {
-    const head = trackItem.querySelector('.track-head');
-    if (!head) return;
-
-    const trackPath = head.dataset.trackPath;
-    if (trackPath === exceptTrackPath) return;
-
-    const details = trackItem.querySelector('.metadata');
-    if (details) {
-      animateMetadataCollapse(details);
-    }
-
-    const expandBtn = trackItem.querySelector('.expand-btn');
-    if (expandBtn) {
-      setExpandButtonState(expandBtn, false);
-    }
-  });
-}
-
-function animateMetadataExpand(detailsElement) {
-  const duration = Math.max(0, Number(scrollConfig.infoToggleSeconds) || 0);
-  if (duration <= 0) {
-    gsap.set(detailsElement, { clearProps: 'height,overflow,opacity' });
-    return;
-  }
-
-  // Measure natural open height first, then animate from collapsed state.
-  gsap.set(detailsElement, {
-    height: 'auto',
-    opacity: 1,
-    paddingTop: 0,
-    paddingBottom: 8,
-    overflow: 'hidden'
-  });
-  const targetHeight = detailsElement.getBoundingClientRect().height;
-
-  gsap.set(detailsElement, {
-    height: 0,
-    opacity: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-    overflow: 'hidden'
-  });
-
-  gsap.killTweensOf(detailsElement);
-  gsap.to(detailsElement, {
-    duration,
-    ease: 'power2.out',
-    height: targetHeight,
-    opacity: 1,
-    paddingTop: 0,
-    paddingBottom: 8,
-    onComplete: () => {
-      gsap.set(detailsElement, { clearProps: 'height,overflow,opacity,paddingTop,paddingBottom' });
-    }
-  });
-}
-
-function animateMetadataCollapse(detailsElement) {
-  const duration = Math.max(0, Number(scrollConfig.infoToggleSeconds) || 0);
-  if (duration <= 0) {
-    detailsElement.remove();
-    return;
-  }
-
-  gsap.killTweensOf(detailsElement);
-  gsap.to(detailsElement, {
-    duration,
-    ease: 'power2.in',
-    height: 0,
-    opacity: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-    overflow: 'hidden',
-    onComplete: () => {
-      detailsElement.remove();
-    }
-  });
-}
-
-function createRatingControl(trackPath, currentRating) {
-  const stars = document.createElement('div');
-  stars.className = 'rating-stars';
-  stars.setAttribute('role', 'group');
-  stars.setAttribute('aria-label', 'Set track rating');
-
-  for (let starValue = 1; starValue <= 5; starValue += 1) {
-    const starBtn = document.createElement('button');
-    starBtn.type = 'button';
-    starBtn.className = 'rating-star-btn';
-    starBtn.title = `Set ${starValue} star rating`;
-    starBtn.textContent = starValue <= currentRating ? '★' : '☆';
-    starBtn.setAttribute('aria-label', `Rate ${starValue} stars`);
-    starBtn.classList.toggle('filled', starValue <= currentRating);
-
-    starBtn.addEventListener('click', async (event) => {
-      event.stopPropagation();
-      const nextRating = starValue === currentRating ? 0 : starValue;
-      await setTrackRating(trackPath, nextRating);
-    });
-
-    starBtn.addEventListener('dblclick', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-    });
-
-    stars.append(starBtn);
-  }
-
-  return stars;
-}
-
-function line(text) {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div;
-}
-
-function metadataLine(label, value) {
-  const row = document.createElement('div');
-
-  const labelSpan = document.createElement('span');
-  labelSpan.className = 'metadata-label';
-  labelSpan.textContent = `${label}: `;
-
-  const valueSpan = document.createElement('span');
-  valueSpan.className = 'metadata-value';
-  valueSpan.textContent = `${value}`;
-
-  row.append(labelSpan, valueSpan);
-  return row;
 }
 
 function openRemoveDialog(trackPath) {
@@ -873,7 +417,7 @@ async function handleRemoveTrack(trackPath) {
     }
 
     await window.aftc.savePlaylist(playlistStore.tracks);
-    renderTrackList({ scrollTarget: 'current' });
+    trackListComponent.render({ scrollTarget: 'current' });
     updateNowPlaying();
     updatePlayPauseButton();
     return;
@@ -896,7 +440,7 @@ async function handleRemoveTrack(trackPath) {
   }
 
   await window.aftc.savePlaylist(playlistStore.tracks);
-  renderTrackList({ scrollTarget: 'none' });
+  trackListComponent.render({ scrollTarget: 'none' });
   updateNowPlaying();
   updatePlayPauseButton();
 }
@@ -937,7 +481,7 @@ async function setTrackRating(trackPath, rating) {
     await player.play();
   }
 
-  renderTrackList({ scrollTarget: 'none' });
+  trackListComponent.render({ scrollTarget: 'none' });
   updateNowPlaying();
 }
 
@@ -973,7 +517,7 @@ async function onPlayPauseClicked() {
     await player.play(selected);
   }
   updatePlayPauseButton();
-  renderTrackList({ scrollTarget: 'none' });
+  trackListComponent.render({ scrollTarget: 'none' });
   updateNowPlaying();
 }
 
@@ -987,7 +531,7 @@ async function onPreviousClicked() {
   }
 
   updateNowPlaying();
-  renderTrackList({ scrollTarget: 'current' });
+  trackListComponent.render({ scrollTarget: 'current' });
   updatePlayPauseButton();
 }
 
@@ -1001,7 +545,7 @@ async function onNextClicked() {
   }
 
   updateNowPlaying();
-  renderTrackList({ scrollTarget: 'current' });
+  trackListComponent.render({ scrollTarget: 'current' });
   updatePlayPauseButton();
 }
 
@@ -1010,14 +554,14 @@ function moveSelection(offset) {
 
   const next = Math.max(0, Math.min(playlistStore.tracks.length - 1, playlistStore.selectedIndex + offset));
   playlistStore.select(next);
-  renderTrackList({ scrollTarget: 'none' });
+  trackListComponent.render({ scrollTarget: 'none' });
   updateNowPlaying();
 }
 
 function handlePlayerStateChange() {
   persistCurrentTrackIfPlaying();
   updatePlayPauseButton();
-  renderTrackList({ scrollTarget: 'none' });
+  trackListComponent.render({ scrollTarget: 'none' });
   updateNowPlaying();
 }
 
@@ -1026,7 +570,7 @@ async function handleTrackEnd() {
     await player.play(player.currentIndex + 1);
     playlistStore.select(player.currentIndex);
     persistCurrentTrackIfPlaying();
-    renderTrackList({ scrollTarget: 'current' });
+    trackListComponent.render({ scrollTarget: 'current' });
     updateNowPlaying();
     return;
   }
@@ -1037,7 +581,7 @@ async function handleTrackEnd() {
   player.isPlaying = false;
   player.isPaused = false;
   player.emitState();
-  renderTrackList({ scrollTarget: 'none' });
+  trackListComponent.render({ scrollTarget: 'none' });
   updateNowPlaying();
   updatePlayPauseButton();
 }
@@ -1063,68 +607,28 @@ function handlePlaybackError(error) {
 }
 
 function updateProgress({ currentTime, duration, currentLabel, durationLabel }) {
-  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
-  const pct = safeDuration > 0 ? (currentTime / safeDuration) * 100 : 0;
-
-  dom.seekBar.dataset.duration = `${safeDuration}`;
-  dom.seekBar.value = `${Math.max(0, Math.min(100, pct))}`;
-  dom.startTime.textContent = '0:00';
-  dom.currentTime.textContent = currentLabel || formatTime(currentTime || 0);
-  dom.durationTime.textContent = durationLabel || formatTime(duration || 0);
+  progressComponent.update({ currentTime, duration, currentLabel, durationLabel });
 }
 
 function resetProgressUi() {
-  dom.seekBar.value = '0';
-  dom.seekBar.dataset.duration = '0';
-  dom.startTime.textContent = '0:00';
-  dom.currentTime.textContent = '0:00';
-  dom.durationTime.textContent = '0:00';
+  progressComponent.reset();
 }
 
 function updateNowPlaying() {
   const current = playlistStore.tracks[player.currentIndex];
   if (!current) {
     dom.nowPlaying.textContent = '';
-    dom.nowPlaying.classList.remove('is-playing');
+    dom.nowPlaying.classList.remove('isPlaying');
     return;
   }
 
   const metadata = metadataByPath.get(current.path);
   dom.nowPlaying.textContent = `♪ ${metadata?.artist || 'Unknown Artist'} - ${current.name}`;
-  dom.nowPlaying.classList.toggle('is-playing', player.isPlaying);
+  dom.nowPlaying.classList.toggle('isPlaying', player.isPlaying);
 }
 
 function updatePlayPauseButton() {
   dom.playPauseBtn.textContent = player.isPlaying ? '⏸ Pause' : '▶ Play';
 }
 
-function syncVolumeIcon(volume) {
-  if (volume <= 0) {
-    dom.volumeIcon.textContent = '🔇';
-    return;
-  }
-  if (volume <= 33) {
-    dom.volumeIcon.textContent = '🔈';
-    return;
-  }
-  if (volume <= 66) {
-    dom.volumeIcon.textContent = '🔉';
-    return;
-  }
-  dom.volumeIcon.textContent = '🔊';
-}
 
-function formatTime(totalSeconds) {
-  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '0:00';
-
-  const secs = Math.floor(totalSeconds);
-  const hours = Math.floor(secs / 3600);
-  const minutes = Math.floor((secs % 3600) / 60);
-  const seconds = secs % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}

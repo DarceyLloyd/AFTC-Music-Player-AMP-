@@ -1,0 +1,38 @@
+:root {
+  --bgApp: #252526;
+  --bgPanel: #2d2d30;
+  --bgSurface: #333333;
+  --bgSubtle: #2a2a2a;
+  --bgSelected: #2f4662;
+  --bgPlaying: #2a3f58;
+  --bgSelectedPlaying: #355a86;
+  --textPrimary: #eeeeee;
+  --textMuted: #b9bcc2;
+  --accent: #007acc;
+  --danger: #f48771;
+  --border: #3f3f46;
+  --focus: #3794ff;
+  --radius: 10px;
+  --space1: 8px;
+  --space2: 12px;
+  --space3: 16px;
+  --transitionFast: 170ms ease;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: "Segoe UI Variable", "Segoe UI", Tahoma, sans-serif;
+  color: var(--textPrimary);
+  background: #1f1f22;
+}
+
+body {
+  padding: var(--space3);
+}
+

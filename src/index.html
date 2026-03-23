@@ -6,46 +6,46 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' file:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';">
   <title>AFTC Music Player</title>
-  <link rel="stylesheet" href="./styles/main.css">
+  <link rel="stylesheet" href="./css/index.css">
 </head>
 <body>
-  <div class="app-shell" id="appShell">
-    <section class="row row-tracks">
-      <header class="section-header">
+  <div class="appShell" id="appShell">
+    <section class="row rowTracks">
+      <header class="sectionHeader">
         <h1>Playlist</h1>
         <p id="importSummary" class="muted">Load MP3, WAV, or FLAC files.</p>
       </header>
-      <div id="dropOverlay" class="drop-overlay" aria-hidden="true">Drop audio files or folders to import</div>
-      <div id="trackList" class="track-list" role="listbox" aria-label="Tracks"></div>
+      <div id="dropOverlay" class="dropOverlay" aria-hidden="true">Drop audio files or folders to import</div>
+      <div id="trackList" class="trackList" role="listbox" aria-label="Tracks"></div>
     </section>
 
-    <section class="row row-progress">
-      <p id="nowPlaying" class="now-playing"></p>
-      <div class="time-row">
+    <section class="row rowProgress">
+      <p id="nowPlaying" class="nowPlaying"></p>
+      <div class="timeRow">
         <span id="startTime">0:00</span>
         <input id="seekBar" type="range" min="0" max="100" value="0" step="0.1" aria-label="Seek">
         <span id="durationTime">0:00</span>
       </div>
-      <div class="current-time-wrap">
+      <div class="currentTimeWrap">
         <span id="currentTime">0:00</span>
       </div>
     </section>
 
-    <section class="row row-controls">
+    <section class="row rowControls">
       <div class="transport">
         <button id="prevBtn" class="btn" type="button">◀◀ Prev</button>
-        <button id="playPauseBtn" class="btn btn-primary" type="button">▶ Play</button>
+        <button id="playPauseBtn" class="btn btnPrimary" type="button">▶ Play</button>
         <button id="stopBtn" class="btn" type="button">■ Stop</button>
         <button id="nextBtn" class="btn" type="button">Next ▶▶</button>
       </div>
-      <div class="aux-controls">
+      <div class="auxControls">
         <button id="clearBtn" class="btn" type="button">Clear</button>
-        <button id="openFolderBtn" class="btn btn-accent" type="button">📁 Open Folder</button>
+        <button id="openFolderBtn" class="btn btnAccent" type="button">📁 Open Folder</button>
       </div>
     </section>
 
-    <section class="row row-volume">
-      <div class="volume-row">
+    <section class="row rowVolume">
+      <div class="volumeRow">
         <span id="volumeIcon" aria-hidden="true">🔉</span>
         <input id="volumeSlider" type="range" min="0" max="100" value="75" step="1" aria-label="Volume">
       </div>
@@ -53,23 +53,23 @@
   </div>
 
   <dialog id="removeDialog" class="dialog">
-    <form method="dialog" class="dialog-content">
+    <form method="dialog" class="dialogContent">
       <h2>Remove Track</h2>
       <p>What would you like to do?</p>
-      <div class="dialog-actions">
+      <div class="dialogActions">
         <button id="removeOnlyBtn" value="remove" type="submit" class="btn">Remove from List</button>
-        <button id="deleteFileBtn" value="delete" type="submit" class="btn btn-danger">Delete File</button>
+        <button id="deleteFileBtn" value="delete" type="submit" class="btn btnDanger">Delete File</button>
         <button value="cancel" type="submit" class="btn">Cancel</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="confirmDeleteDialog" class="dialog">
-    <form method="dialog" class="dialog-content">
+    <form method="dialog" class="dialogContent">
       <h2>Delete File</h2>
       <p>Move this file to Recycle Bin?</p>
-      <div class="dialog-actions">
-        <button value="confirm" type="submit" class="btn btn-danger">OK</button>
+      <div class="dialogActions">
+        <button value="confirm" type="submit" class="btn btnDanger">OK</button>
         <button value="cancel" type="submit" class="btn">Cancel</button>
       </div>
     </form>
@@ -78,3 +78,4 @@
   <script type="module" src="./renderer.js"></script>
 </body>
 </html>
+

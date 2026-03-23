@@ -1,0 +1,20 @@
+@media (max-width: 900px) {
+  .rowControls {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .transport {
+    justify-self: stretch;
+    justify-content: center;
+  }
+
+  #openFolderBtn {
+    justify-self: center;
+  }
+
+  .auxControls {
+    justify-self: center;
+  }
+}
+

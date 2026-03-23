@@ -1,3 +1,7 @@
+import { pathToFileUrl } from '../services/player/fileUrl.js';
+import { classifyPlaybackError } from '../services/player/errorClassifier.js';
+import { createTimeSnapshot } from '../services/player/timeSnapshot.js';
+
 export class AudioPlayer {
   constructor({ onStateChange, onTimeUpdate, onTrackEnd, onError } = {}) {
     this.audio = new Audio();
@@ -11,21 +15,11 @@ export class AudioPlayer {
     this.onError = onError;
 
     this.audio.addEventListener('timeupdate', () => {
-      this.onTimeUpdate?.({
-        currentTime: this.audio.currentTime || 0,
-        duration: this.audio.duration || 0,
-        currentLabel: formatTime(this.audio.currentTime || 0),
-        durationLabel: formatTime(this.audio.duration || 0)
-      });
+      this.onTimeUpdate?.(createTimeSnapshot(this.audio));
     });
 
     this.audio.addEventListener('loadedmetadata', () => {
-      this.onTimeUpdate?.({
-        currentTime: this.audio.currentTime || 0,
-        duration: this.audio.duration || 0,
-        currentLabel: formatTime(this.audio.currentTime || 0),
-        durationLabel: formatTime(this.audio.duration || 0)
-      });
+      this.onTimeUpdate?.(createTimeSnapshot(this.audio));
     });
 
     this.audio.addEventListener('ended', () => {
@@ -84,7 +78,7 @@ export class AudioPlayer {
       this.isPaused = false;
       this.emitState();
       this.onError?.({
-        category: 'codec-or-container',
+        category: 'codecOrContainer',
         message: error.message || 'Unable to decode or play this file.'
       });
       return false;
@@ -149,63 +143,4 @@ export class AudioPlayer {
       hasTrack: this.currentIndex >= 0 && this.currentIndex < this.playlist.length
     });
   }
-}
-
-function formatTime(totalSeconds) {
-  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '0:00';
-
-  const secs = Math.floor(totalSeconds);
-  const hours = Math.floor(secs / 3600);
-  const minutes = Math.floor((secs % 3600) / 60);
-  const seconds = secs % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-function pathToFileUrl(filePath) {
-  const normalized = filePath.replace(/\\/g, '/');
-  const encoded = normalized
-    .split('/')
-    .map((part) => encodeURIComponent(part).replace(/%3A/g, ':'))
-    .join('/');
-  return `file:///${encoded}`;
-}
-
-function classifyPlaybackError(mediaError) {
-  if (!mediaError) {
-    return {
-      category: 'unknown',
-      message: 'Playback failed for an unknown reason.'
-    };
-  }
-
-  if (mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-    return {
-      category: 'codec-or-container',
-      message: 'Unsupported codec or container for this file.'
-    };
-  }
-
-  if (mediaError.code === MediaError.MEDIA_ERR_DECODE) {
-    return {
-      category: 'corrupt-file',
-      message: 'The file appears to be corrupted or unreadable.'
-    };
-  }
-
-  if (mediaError.code === MediaError.MEDIA_ERR_NETWORK) {
-    return {
-      category: 'access-path',
-      message: 'Cannot access this file location.'
-    };
-  }
-
-  return {
-    category: 'unknown',
-    message: 'Playback failed. Please try another file.'
-  };
 }
